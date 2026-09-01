@@ -46,7 +46,7 @@ async function handle(req: NextRequest) {
     return stopwords.some((w) => b.includes(w));
   };
 
-  let reassigned = 0, resolved = 0, closed = 0, checked = 0;
+  let reassigned = 0, resolved = 0, closed = 0, checked = 0, engaged = 0;
   for (const a of open ?? []) {
     checked++;
     let conv;
@@ -81,8 +81,16 @@ async function handle(req: NextRequest) {
     const idleFrom = Math.max(new Date(a.assigned_at).getTime(), conv.lastDate ?? 0);
     if (Date.now() - idleFrom < IDLE_MS) continue;
 
-    // If the dispatcher already opened/read the conversation, they're handling it — don't yank it.
-    if (REQUIRE_UNREAD && conv.unreadCount === 0) continue;
+    // If the dispatcher already opened/read the conversation, it's THEIRS (sticky):
+    // stop tracking it so it's never auto-reassigned again — even if a new inbound
+    // arrives and they take a while to reply. Fixes conversations "disappearing" from
+    // an agent's My Inbox while they're actively handling them. Round-robin only
+    // redistributes conversations the assigned agent has NEVER opened.
+    if (REQUIRE_UNREAD && conv.unreadCount === 0) {
+      await sb.from("active_assignments").delete().eq("contact_id", a.contact_id);
+      engaged++;
+      continue;
+    }
 
     if (a.reassign_count >= MAX_REASSIGNS) {
       await addContactTags(a.contact_id, ["sin_respuesta"]).catch(() => {});
@@ -118,7 +126,7 @@ async function handle(req: NextRequest) {
     reassigned++;
   }
 
-  return NextResponse.json({ ok: true, checked, reassigned, resolved, closed });
+  return NextResponse.json({ ok: true, checked, reassigned, resolved, closed, engaged });
 }
 
 export const POST = handle;
