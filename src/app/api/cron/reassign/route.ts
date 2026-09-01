@@ -20,10 +20,12 @@ async function handle(req: NextRequest) {
 
   const sb = getServiceClient();
 
-  // Refresh the live pool first so "active right now" reflects the CURRENT messaging slot.
-  // pg_cron only refreshes hourly at minute 0; without this, a reassignment firing right after
-  // the hour boundary could pick a dispatcher whose slot just ended (off their round-robin hour).
-  await sb.rpc("refresh_pool_activo").then(() => {}, () => {});
+  // Refrescar el pool SOLO cerca del borde de hora (minutos 0-2). Antes se hacía
+  // en CADA tick (cada minuto) → wipe+rebuild del pool cada minuto (carrera del
+  // pool vacío) y churn innecesario. pg_cron lo refresca por hora; esto cubre el
+  // borde sin el churn por-tick.
+  const curMin = new Date().getUTCMinutes();
+  if (curMin <= 2) await sb.rpc("refresh_pool_activo").then(() => {}, () => {});
 
   const { data: cfg } = await sb.from("reassign_config").select("*").eq("id", true).single();
   if (cfg && cfg.enabled === false) {
@@ -32,10 +34,14 @@ async function handle(req: NextRequest) {
   const IDLE_MS = (cfg?.idle_minutes ?? 5) * 60 * 1000;
   const MAX_REASSIGNS = cfg?.max_reassigns ?? 5;
   const REQUIRE_UNREAD = cfg?.require_unread ?? true;
+  // Tope de conversaciones a revisar por tick: cada una hace un GET a GHL, y
+  // esto corre cada minuto → limitarlo baja fuerte la carga de GHL (evita la
+  // ráfaga que dispara los 429 que comparten con la app de mensajería).
+  const BATCH = Number(process.env.REASSIGN_BATCH ?? 25);
 
   const cutoff = new Date(Date.now() - IDLE_MS).toISOString();
   const [{ data: open }, { data: stops }] = await Promise.all([
-    sb.from("active_assignments").select("*").lt("assigned_at", cutoff).limit(100),
+    sb.from("active_assignments").select("*").lt("assigned_at", cutoff).order("assigned_at", { ascending: true }).limit(BATCH),
     sb.from("reassign_stopwords").select("word"),
   ]);
   const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
