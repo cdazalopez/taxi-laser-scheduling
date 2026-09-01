@@ -1,0 +1,63 @@
+external_ref,full_name,email,phone,role,status,skills,hire_date
+D003,Wilmer Jose Gonzalez Hernandez,03_wilmer@taxilaserllc.com,,dispatcher,activo,,2021-09-01
+D004,Andreina Jose Reyes Briceño,04_andreina@taxilaserllc.com,,dispatcher,activo,,2019-03-01
+D005,Mariano Joaquin Cachada,05_mariano@taxilaserllc.com,,dispatcher,activo,,2021-04-05
+D007,Paola Vanessa Pineda Gonzalez,07_paola@taxilaserllc.com,,dispatcher,activo,,2022-01-25
+D008,Airi Rebeca Lozada Lopez,08_airi@taxilaserllc.com,,dispatcher,activo,,2021-11-11
+D077,Wilfer Steven Zambrano Cedeño,77_wilfer@taxilaserllc.com,,dispatcher,activo,,2022-06-04
+D050,Daniela Jasmin Diaz,50_daniela@taxilaserllc.com,,dispatcher,activo,,2022-02-26
+D067,Genesis Andreina Talavera Parra,67_genesis@taxilaserllc.com,,dispatcher,activo,,2021-11-01
+D044,Gonzalo Ramiro Gimenez,44_gonzalo@taxilaserllc.com,,dispatcher,activo,,2022-06-04
+D031,Flavio Enrique Gimenez,31_flavio@taxilaserllc.com,,dispatcher,activo,,2023-03-23
+D012,Rawin Guisseppe Ferrigno,12_rawin@taxilaserllc.com,,dispatcher,activo,,2023-05-01
+D029,Sofia Pizzarro,29_sofia@taxilaserllc.com,,dispatcher,activo,,2023-05-19
+D021,Maria Diaz,21_maria@taxilaserllc.com,,dispatcher,activo,,2023-08-12
+D028,Solange Subiri,28_solange@taxilaserllc.com,,dispatcher,activo,,2023-08-27
+D038,Gaspar Castagnino,38_gaspar@taxilaserllc.com,,dispatcher,activo,,2024-02-21
+D011,Ivan Delmas,11_ivan@taxilaserllc.com,,dispatcher,activo,,2024-03-24
+D017,Marco Rios,17_marcos@taxilaserllc.com,,dispatcher,activo,,2024-04-09
+D026,Vanessa Del Socorro Mercado,26_vanessa@taxilaserllc.com,,dispatcher,activo,,2024-05-13
+D032,Adrianny Alvarez,32_adrianny@taxilaserllc.com,,dispatcher,activo,,2024-05-22
+D045,Cristobal Otranto,45_cristobal@taxilaserllc.com,,dispatcher,activo,,2024-06-12
+D046,Roxana Rivas,46_roxanna@taxilaserllc.com,,dispatcher,activo,,2024-06-26
+D047,Luis Forero,47_luis@taxilaserllc.com,,dispatcher,activo,,2024-07-04
+D051,Juan Rudas,51_juan@taxilaserllc.com,,dispatcher,activo,,2024-07-23
+D054,Ernesto Martinez,54_ernesto@taxilaserllc.com,,dispatcher,activo,,2024-08-13
+D013,Joaquin Sanchez,13_joaquin@taxilaserllc.com,,dispatcher,activo,,2024-10-14
+D033,Rigoberto Diaz,33_rigoberto@taxilaserllc.com,,dispatcher,activo,,2024-11-03
+D064,Lautaro Bravo Goncalves,64_lautaro@taxilaserllc.com,,dispatcher,activo,,2024-12-17
+D068,Ismael Molina Saggin,68_ismael@taxilaserllc.com,,dispatcher,activo,,2024-12-18
+D040,Freddy Moron,40_freddy@taxilaserllc.com,,dispatcher,activo,,2025-02-15
+D081,Liza Ferrante,81_liza@taxilaserllc.com,,dispatcher,activo,,2025-02-19
+D083,Luis Castillo M,83_luis@taxilaserllc.com,,dispatcher,activo,,2025-03-11
+D084,Juan Pazos,84_juan@taxilaserllc.com,,dispatcher,activo,,2025-03-11
+D027,Ezequiel Quse,27_ezequiel@taxilaserllc.com,,dispatcher,activo,,2025-03-26
+D091,Alexander Berti,91_alexander@taxilaserllc.com,,dispatcher,activo,,2025-04-08
+D096,Axel Gonzalez,96_axel@taxilaserllc.com,,dispatcher,activo,,2025-04-29
+D097,Critina Ticas,97_cristina@taxilaserllc.com,,dispatcher,activo,,2025-04-29
+D090,Isaac Gabriel Valbuena Garcia,90_isaac@taxilaserllc.com,,dispatcher,activo,,2025-05-14
+D087,Jorge Moises Castillo Maestre,87_moises@taxilaserllc.com,,dispatcher,activo,,2025-05-21
+D079,Mayreangel Inmaculada Estrada Gonzalez,79_mayreangel@taxilaserllc.com,,dispatcher,activo,,2025-06-08
+D080,Alejandro Venacio Semprum Acosta,80_alejandro@taxilaserllc.com,,dispatcher,activo,,2025-06-08
+D082,Valeria Leon,82_valeria@taxilaserllc.com,,dispatcher,activo,,2025-06-08
+D071,Mirna Rivers,71_mirna@taxilaserllc.com,,dispatcher,activo,,2025-07-19
+D076,Juan Cruz Enmanuel Aguero,76_juan@taxilaserllc.com,,dispatcher,activo,,2025-07-19
+D078,Ana Carnales,78_ana@taxilaserllc.com,,dispatcher,activo,,2025-07-19
+D030,Thiago E Conforti,30_thiago@taxilaserllc.com,,dispatcher,activo,,2025-09-08
+D063,Veronica Semprum,63_veronica@taxilaserllc.com,,dispatcher,activo,,2025-10-04
+D006,Thiago Jeremias Agustin Barrionuevo,06_thiago@taxilaserllc.com,,dispatcher,activo,,2026-01-28
+D037,Samira Florentin,37_samira@taxilaserllc.com,,dispatcher,activo,,2026-01-13
+D052,Paola Peña,52_paola@taxilaserllc.com,,dispatcher,activo,,2026-01-28
+D093,Federico Otranto,93_federico@taxilaserllc.com,,dispatcher,activo,,2026-02-03
+D023,Yarais Valbuena,23_yarais@taxilaserllc.com,,dispatcher,activo,,2026-07-04
+D053,Francisco Esteche,53_francisco@taxilaserllc.com,,dispatcher,activo,,2026-07-04
+D025,Emilio Parras,25_emilio@taxilaserllc.com,,dispatcher,activo,,
+D085,Manuel Brito,85_manuel@taxilaserllc.com,,dispatcher,activo,,
+D070,Francelis Coronado,70_francellis@taxilaserllc.com,,dispatcher,activo,,2026-05-03
+D073,Henry Gutierrez,73_henry@taxilaserllc.com,,dispatcher,activo,,2026-05-09
+D074,Juan Manuel Figueroa,74_juan@taxilaserllc.com,,dispatcher,activo,,2026-05-10
+D014,Florencia Bultynch,14_florencia@taxilaserllc.com,,dispatcher,activo,,2026-05-19
+D015,Scarleth Valle,15_scarleth@taxilaserllc.com,,dispatcher,activo,,2026-05-19
+D034,Juan Brito Flores,34_juan@taxilaserllc.com,,dispatcher,activo,,2026-06-02
+D041,Ibsen Brito,41_ibsen@taxilaserllc.com,,dispatcher,activo,,2026-06-02
+D049,Valentin Esteche,49_valentin@taxilaserllc.com,,dispatcher,activo,,2026-06-02
