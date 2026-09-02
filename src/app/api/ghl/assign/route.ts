@@ -118,7 +118,23 @@ export async function POST(req: NextRequest) {
           .eq("dispatcher_id", owner.id)
           .maybeSingle();
         if (pa?.is_active) {
-          // owner is active → keep the relationship, don't burn a rotation slot
+          // owner is active → keep the relationship, don't burn a rotation slot.
+          // Re-enter tracking so the poller monitors this conversation even if it
+          // previously fell out (stopword, prior read-close, etc.).
+          await sb.from("active_assignments")
+            .upsert(
+              {
+                contact_id: contactId,
+                dispatcher_id: owner.id,
+                assigned_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                reassign_count: 0,
+                ...(contactName ? { contact_name: contactName } : {}),
+                ...(channel ? { channel } : {}),
+              },
+              { onConflict: "contact_id" }
+            )
+            .then(() => {}, () => {});
           return NextResponse.json(
             { assigned: false, reason: "owner_active", ghl_user_id: currentGhl },
             { status: 200 }

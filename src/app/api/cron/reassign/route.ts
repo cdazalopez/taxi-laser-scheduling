@@ -90,10 +90,13 @@ async function handle(req: NextRequest) {
     const idleFrom = Math.max(new Date(a.updated_at ?? a.assigned_at).getTime(), conv.lastDate ?? 0);
     if (Date.now() - idleFrom < IDLE_MS) continue;
 
-    // Dispatcher opened/read the conversation → it's theirs, stop tracking.
-    // Prevents reassignment of conversations actively being handled.
+    // Dispatcher read the conversation — reset the idle clock instead of closing.
+    // If they don't reply within another IDLE_MS window it will be reassigned normally.
     if (REQUIRE_UNREAD && conv.unreadCount === 0) {
-      await sb.from("active_assignments").delete().eq("contact_id", a.contact_id);
+      await sb.from("active_assignments")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("contact_id", a.contact_id)
+        .then(() => {}, () => {});
       engaged++;
       continue;
     }
