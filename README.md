@@ -70,10 +70,10 @@ data/dispatchers.csv         # Listado de dispatchers a importar
 
 ## Acceso (login)
 
-Las **páginas** están protegidas por un gate de contraseña (proxy en `src/proxy.ts`); las **APIs
+Las **páginas** están protegidas por un gate de contraseña (middleware en `src/middleware.ts`); las **APIs
 no** (usan su propio `x-webhook-secret`, para que GHL y pg_cron sigan funcionando).
 
-- Contraseña actual: `TaxiLaser2026` (env `APP_PASSWORD`). Cámbiala en `.env.local` y en Vercel.
+- Contraseña: configurada en `APP_PASSWORD` (`.env.local` y Vercel — no incluida en el repo).
 - La sesión es una cookie httpOnly (`tl_auth` = `APP_SESSION_TOKEN`), 30 días. "Salir" en el header.
 
 ## Producción

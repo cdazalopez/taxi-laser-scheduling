@@ -1,8 +1,17 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { getServiceClient } from "@/lib/supabase/server";
 import type { PermisoTipo, ShiftEstado } from "@/lib/types";
+
+async function requireAuth(): Promise<{ ok: false; error: string } | null> {
+  const token = process.env.APP_SESSION_TOKEN;
+  const cookieStore = await cookies();
+  const cookie = cookieStore.get("tl_auth")?.value;
+  if (!token || cookie !== token) return { ok: false, error: "Unauthorized" };
+  return null;
+}
 
 /** Set a cell in the generated role grid: 'off' (remove), 'work' (on shift, no role), or a sigla (A/A1/A2/MR/NE). */
 export async function setRoleCell(
@@ -12,6 +21,8 @@ export async function setRoleCell(
   hour: number,
   state: "off" | "work" | "A" | "A1" | "A2" | "MR" | "NE"
 ) {
+  const unauth = await requireAuth();
+  if (unauth) return unauth;
   const sb = getServiceClient();
   if (state === "off") {
     const { error } = await sb.from("generated_roles").delete().match({ run_id: runId, dispatcher_id: dispatcherId, work_date: workDate, hour });
@@ -33,6 +44,8 @@ export async function updateGeneratedShift(
   startHour: number,
   endHour: number
 ) {
+  const unauth = await requireAuth();
+  if (unauth) return unauth;
   const sb = getServiceClient();
   if (endHour <= startHour || startHour < 0 || endHour > 24) {
     return { ok: false, error: "Rango horario inválido" };
@@ -47,6 +60,8 @@ export async function updateGeneratedShift(
 }
 
 export async function deleteGeneratedShift(id: string) {
+  const unauth = await requireAuth();
+  if (unauth) return unauth;
   const sb = getServiceClient();
   const { error } = await sb.from("generated_shifts").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
@@ -62,6 +77,8 @@ export async function addGeneratedShift(
   endHour: number,
   roleHint: string
 ) {
+  const unauth = await requireAuth();
+  if (unauth) return unauth;
   const sb = getServiceClient();
   const { error } = await sb.from("generated_shifts").insert({
     run_id: runId,
@@ -77,6 +94,8 @@ export async function addGeneratedShift(
 }
 
 export async function updateProfile(dispatcherId: string, formData: FormData) {
+  const unauth = await requireAuth();
+  if (unauth) return unauth;
   const sb = getServiceClient();
   const num = (k: string) => {
     const v = formData.get(k);
@@ -110,6 +129,8 @@ export async function updateProfile(dispatcherId: string, formData: FormData) {
 /** Clear the live "En vivo" tab: wipe the assignment log + open-conversation tracking so the
  *  counters and feed reset to 0 for a clean start. */
 export async function clearLiveTab() {
+  const unauth = await requireAuth();
+  if (unauth) return unauth;
   const sb = getServiceClient();
   const e1 = await sb.from("assignment_log").delete().not("id", "is", null);
   if (e1.error) return { ok: false, error: e1.error.message };
@@ -120,6 +141,8 @@ export async function clearLiveTab() {
 }
 
 export async function updateAppSettings(formData: FormData) {
+  const unauth = await requireAuth();
+  if (unauth) return unauth;
   const sb = getServiceClient();
   const tz = String(formData.get("schedule_tz") || "America/New_York");
   const { error } = await sb
@@ -134,6 +157,8 @@ export async function updateAppSettings(formData: FormData) {
 }
 
 export async function updateReassignConfig(formData: FormData) {
+  const unauth = await requireAuth();
+  if (unauth) return unauth;
   const sb = getServiceClient();
   const { error } = await sb.from("reassign_config").update({
     enabled: formData.get("enabled") === "on",
@@ -148,6 +173,8 @@ export async function updateReassignConfig(formData: FormData) {
 }
 
 export async function addStopword(word: string) {
+  const unauth = await requireAuth();
+  if (unauth) return unauth;
   const sb = getServiceClient();
   const w = word.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   if (!w) return { ok: false, error: "Palabra vacía" };
@@ -158,6 +185,8 @@ export async function addStopword(word: string) {
 }
 
 export async function removeStopword(id: string) {
+  const unauth = await requireAuth();
+  if (unauth) return unauth;
   const sb = getServiceClient();
   const { error } = await sb.from("reassign_stopwords").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
@@ -167,6 +196,8 @@ export async function removeStopword(id: string) {
 
 /** Manually pull a dispatcher out of the live pool (offline) or put them back (null). */
 export async function setDispatcherOffline(id: string, offline: boolean) {
+  const unauth = await requireAuth();
+  if (unauth) return unauth;
   const sb = getServiceClient();
   const { error } = await sb
     .from("dispatchers")
@@ -180,6 +211,8 @@ export async function setDispatcherOffline(id: string, offline: boolean) {
 }
 
 export async function createShift(formData: FormData) {
+  const unauth = await requireAuth();
+  if (unauth) return unauth;
   const sb = getServiceClient();
   const dispatcher_id = String(formData.get("dispatcher_id") || "");
   const shift_date = String(formData.get("shift_date") || "");
@@ -207,6 +240,8 @@ export async function createShift(formData: FormData) {
 }
 
 export async function updateShift(id: string, formData: FormData) {
+  const unauth = await requireAuth();
+  if (unauth) return unauth;
   const sb = getServiceClient();
   const shift_date = String(formData.get("shift_date") || "");
   const shift_start = String(formData.get("shift_start") || "");
@@ -231,6 +266,8 @@ export async function updateShift(id: string, formData: FormData) {
 }
 
 export async function deleteShift(id: string) {
+  const unauth = await requireAuth();
+  if (unauth) return unauth;
   const sb = getServiceClient();
   const { error } = await sb.from("schedule").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
@@ -239,6 +276,8 @@ export async function deleteShift(id: string) {
 }
 
 export async function createPermiso(formData: FormData) {
+  const unauth = await requireAuth();
+  if (unauth) return unauth;
   const sb = getServiceClient();
   const dispatcher_id = String(formData.get("dispatcher_id") || "");
   const tipo = String(formData.get("tipo") || "permiso") as PermisoTipo;
@@ -268,6 +307,8 @@ export async function decidePermiso(
   decision: "aprobado" | "rechazado",
   approvedBy?: string
 ) {
+  const unauth = await requireAuth();
+  if (unauth) return unauth;
   const sb = getServiceClient();
   const { error } = await sb
     .from("permisos")

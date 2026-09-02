@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
  * API routes are NOT gated (they authenticate with their own secret headers,
  * so GHL webhooks and pg_cron/manual triggers keep working).
  */
-export default function proxy(req: NextRequest) {
+export default function middleware(req: NextRequest) {
   const token = process.env.APP_SESSION_TOKEN;
   const cookie = req.cookies.get("tl_auth")?.value;
   if (token && cookie === token) return NextResponse.next();
