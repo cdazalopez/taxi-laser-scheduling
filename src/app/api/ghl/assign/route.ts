@@ -150,11 +150,22 @@ export async function POST(req: NextRequest) {
   }
 
   // Assign the conversation to the chosen dispatcher in GHL.
+  // Retry once on 429 (rate-limit) with a short backoff before giving up.
   try {
     await assignContact(contactId, row.ghl_user_id);
   } catch (e: any) {
-    await log("assign_error", row.dispatcher_id, e.message);
-    return NextResponse.json({ assigned: false, reason: "ghl_assign_error", error: e.message }, { status: 502 });
+    if (e.message?.includes("429")) {
+      await new Promise((r) => setTimeout(r, 1500));
+      try {
+        await assignContact(contactId, row.ghl_user_id);
+      } catch (e2: any) {
+        await log("assign_error", row.dispatcher_id, e2.message);
+        return NextResponse.json({ assigned: false, reason: "ghl_assign_error", error: e2.message }, { status: 502 });
+      }
+    } else {
+      await log("assign_error", row.dispatcher_id, e.message);
+      return NextResponse.json({ assigned: false, reason: "ghl_assign_error", error: e.message }, { status: 502 });
+    }
   }
 
   // Log as a reassignment (returning customer, owner inactive) or a fresh assignment.

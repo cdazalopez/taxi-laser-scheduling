@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * Reassign poller (run ~every minute via Vercel Cron or an external scheduler).
- * For each open assignment idle >2min where the client's message is still unanswered
- * (last message inbound), reassign the conversation to the next dispatcher in rotation.
+ * For each open assignment idle >idle_minutes where the client's message is still
+ * unanswered (last message inbound), reassign the conversation to the next dispatcher.
  *
  * Auth: `Authorization: Bearer <CRON_SECRET>` or header `x-webhook-secret`.
  */
@@ -20,10 +20,7 @@ async function handle(req: NextRequest) {
 
   const sb = getServiceClient();
 
-  // Refrescar el pool SOLO cerca del borde de hora (minutos 0-2). Antes se hacía
-  // en CADA tick (cada minuto) → wipe+rebuild del pool cada minuto (carrera del
-  // pool vacío) y churn innecesario. pg_cron lo refresca por hora; esto cubre el
-  // borde sin el churn por-tick.
+  // Refresh pool only near the hour boundary (minutes 0-2) to avoid churn.
   const curMin = new Date().getUTCMinutes();
   if (curMin <= 2) await sb.rpc("refresh_pool_activo").then(() => {}, () => {});
 
@@ -31,17 +28,16 @@ async function handle(req: NextRequest) {
   if (cfg && cfg.enabled === false) {
     return NextResponse.json({ ok: true, disabled: true });
   }
-  const IDLE_MS = (cfg?.idle_minutes ?? 5) * 60 * 1000;
+  const IDLE_MS = (cfg?.idle_minutes ?? 10) * 60 * 1000;
   const MAX_REASSIGNS = cfg?.max_reassigns ?? 5;
   const REQUIRE_UNREAD = cfg?.require_unread ?? true;
-  // Tope de conversaciones a revisar por tick: cada una hace un GET a GHL, y
-  // esto corre cada minuto → limitarlo baja fuerte la carga de GHL (evita la
-  // ráfaga que dispara los 429 que comparten con la app de mensajería).
   const BATCH = Number(process.env.REASSIGN_BATCH ?? 25);
 
   const cutoff = new Date(Date.now() - IDLE_MS).toISOString();
+  // Use updated_at (not assigned_at) so the idle clock resets correctly after
+  // each reassignment and after we update the row for any reason.
   const [{ data: open }, { data: stops }] = await Promise.all([
-    sb.from("active_assignments").select("*").lt("assigned_at", cutoff).order("assigned_at", { ascending: true }).limit(BATCH),
+    sb.from("active_assignments").select("*").lt("updated_at", cutoff).order("updated_at", { ascending: true }).limit(BATCH),
     sb.from("reassign_stopwords").select("word"),
   ]);
   const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -62,6 +58,14 @@ async function handle(req: NextRequest) {
       continue; // GHL hiccup — try next tick
     }
 
+    // Store conversation_id on first fetch so future ticks use the right conversation.
+    if (conv.conversationId && !a.conversation_id) {
+      await sb.from("active_assignments")
+        .update({ conversation_id: conv.conversationId, updated_at: new Date().toISOString() })
+        .eq("contact_id", a.contact_id)
+        .then(() => {}, () => {});
+    }
+
     // Dispatcher (or anyone) replied → conversation is being handled. Stop tracking.
     if (conv.lastDirection === "outbound") {
       await sb.from("active_assignments").delete().eq("contact_id", a.contact_id);
@@ -78,20 +82,16 @@ async function handle(req: NextRequest) {
 
     // Only reassign when the client is actually waiting (last message inbound).
     if (conv.lastDirection !== "inbound") {
-      // No conversation / no messages — drop very stale trackers to avoid buildup.
-      if (Date.now() - new Date(a.assigned_at).getTime() > 15 * 60 * 1000)
+      if (Date.now() - new Date(a.updated_at ?? a.assigned_at).getTime() > 15 * 60 * 1000)
         await sb.from("active_assignments").delete().eq("contact_id", a.contact_id);
       continue;
     }
 
-    const idleFrom = Math.max(new Date(a.assigned_at).getTime(), conv.lastDate ?? 0);
+    const idleFrom = Math.max(new Date(a.updated_at ?? a.assigned_at).getTime(), conv.lastDate ?? 0);
     if (Date.now() - idleFrom < IDLE_MS) continue;
 
-    // If the dispatcher already opened/read the conversation, it's THEIRS (sticky):
-    // stop tracking it so it's never auto-reassigned again — even if a new inbound
-    // arrives and they take a while to reply. Fixes conversations "disappearing" from
-    // an agent's My Inbox while they're actively handling them. Round-robin only
-    // redistributes conversations the assigned agent has NEVER opened.
+    // Dispatcher opened/read the conversation → it's theirs, stop tracking.
+    // Prevents reassignment of conversations actively being handled.
     if (REQUIRE_UNREAD && conv.unreadCount === 0) {
       await sb.from("active_assignments").delete().eq("contact_id", a.contact_id);
       engaged++;
@@ -104,30 +104,45 @@ async function handle(req: NextRequest) {
       continue;
     }
 
-    // Mark the current holder as just-assigned so the rotation won't pick them again.
-    await sb.from("dispatchers").update({ last_assigned_at: new Date().toISOString() }).eq("id", a.dispatcher_id);
     const { data } = await sb.rpc("assign_next_dispatcher");
     const next = Array.isArray(data) ? data[0] : data;
-    if (!next || !next.ghl_user_id || next.dispatcher_id === a.dispatcher_id) continue; // no one else available
+    if (!next || !next.ghl_user_id || next.dispatcher_id === a.dispatcher_id) continue;
 
     try {
       await assignContact(a.contact_id, next.ghl_user_id);
     } catch {
+      // GHL rejected the assignment — undo the last_assigned_at stamp the RPC set
+      // so the rotation isn't skewed by a failed call.
+      await sb.from("dispatchers")
+        .update({ last_assigned_at: a.dispatcher_id ? new Date(0).toISOString() : null })
+        .eq("id", next.dispatcher_id)
+        .then(() => {}, () => {});
       continue;
     }
+
+    // Only stamp old dispatcher AFTER GHL confirms — avoids skewing rotation on failure.
+    await sb.from("dispatchers")
+      .update({ last_assigned_at: new Date().toISOString() })
+      .eq("id", a.dispatcher_id);
 
     await sb.from("assignment_log").insert({
       outcome: "reassigned",
       dispatcher_id: next.dispatcher_id,
       reassigned_from: a.dispatcher_id,
-      reason: "no_response_2min",
+      reason: "no_response",
       contact_id: a.contact_id,
       contact_name: a.contact_name,
       channel: a.channel,
     });
     await sb
       .from("active_assignments")
-      .update({ dispatcher_id: next.dispatcher_id, assigned_at: new Date().toISOString(), reassign_count: a.reassign_count + 1, updated_at: new Date().toISOString(), conversation_id: conv.conversationId })
+      .update({
+        dispatcher_id: next.dispatcher_id,
+        assigned_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        reassign_count: a.reassign_count + 1,
+        conversation_id: conv.conversationId,
+      })
       .eq("contact_id", a.contact_id);
     reassigned++;
   }
