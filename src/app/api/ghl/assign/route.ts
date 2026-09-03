@@ -1,21 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase/server";
-import { assignContact, addContactTags, getContactAssignedTo } from "@/lib/ghl";
+import { assignContact, addContactTags, getContactAssignedTo, getContactConversation } from "@/lib/ghl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GHL numeric message.type → channel label (extend as new channels are seen).
+// GHL numeric message.type → channel label.
+// Types confirmed from GHL API docs + production observation.
 const GHL_TYPE: Record<number, string> = {
   1: "Llamada",
   2: "SMS",
   3: "Email",
   4: "SMS",
   5: "Webchat",
+  11: "Llamada",    // Phone call (inbound)
   16: "Facebook",
   17: "Instagram",
+  18: "SMS",         // SMS (alternate GHL type)
   19: "WhatsApp",
   20: "WhatsApp",
+  22: "WhatsApp",    // WhatsApp Business API
   25: "Instagram",
 };
 
@@ -35,12 +39,16 @@ function normChannel(v: unknown): string | null {
 /** Best channel label from a GHL webhook payload. */
 function detectChannel(body: any): string | null {
   const type = body.message?.type ?? body.message_type;
+  const fromType = typeof type === "number" ? GHL_TYPE[type] : null;
+  if (typeof type === "number" && !fromType) {
+    console.warn(`[ghl/assign] tipo de mensaje desconocido: ${type} — agregar a GHL_TYPE`);
+  }
   return (
-    (typeof type === "number" ? GHL_TYPE[type] : null) ||
+    fromType ||
     normChannel(body.contact_source) ||
     normChannel(body.message?.type) ||
     normChannel(body.channel) ||
-    (type != null ? `Tipo ${type}` : null)
+    (type != null ? "Otro" : null)
   );
 }
 
@@ -93,9 +101,11 @@ export async function POST(req: NextRequest) {
         () => {}
       );
 
-  // Refresh the live pool first so "active right now" reflects the CURRENT messaging slot,
-  // manual offline toggles, and approved leave — never a stale snapshot.
-  await sb.rpc("refresh_pool_activo").then(() => {}, () => {});
+  // Refresh the live pool only at the top of each hour (minutes 0-2) to avoid burning
+  // GHL quota and Supabase RPC calls on every single inbound message.
+  if (new Date().getMinutes() <= 2) {
+    await sb.rpc("refresh_pool_activo").then(() => {}, () => {});
+  }
 
   // The trigger fires on every inbound message. A contact may already have an owner from a
   // PAST conversation. Keep that owner ONLY if they are active in the pool right now; otherwise
@@ -184,6 +194,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Best-effort: fetch conversationId now so active_assignments has it from the start.
+  // The reassign cron will also fetch it on its first tick if this fails.
+  let conversationId: string | null = null;
+  try {
+    const conv = await getContactConversation(contactId);
+    conversationId = conv?.conversationId ?? null;
+  } catch {
+    // non-critical — cron populates on next tick
+  }
+
   // Log as a reassignment (returning customer, owner inactive) or a fresh assignment.
   await sb
     .from("assignment_log")
@@ -198,14 +218,25 @@ export async function POST(req: NextRequest) {
       raw: body,
     })
     .then(() => {}, () => {});
-  // Track as an open assignment so the reassign poller can monitor 2-min inactivity.
+
+  // Track as an open assignment so the reassign poller can monitor inactivity.
   await sb
     .from("active_assignments")
     .upsert(
-      { contact_id: contactId, dispatcher_id: row.dispatcher_id, assigned_at: new Date().toISOString(), reassign_count: 0, contact_name: contactName, channel, updated_at: new Date().toISOString() },
+      {
+        contact_id: contactId,
+        conversation_id: conversationId,
+        dispatcher_id: row.dispatcher_id,
+        assigned_at: new Date().toISOString(),
+        reassign_count: 0,
+        contact_name: contactName,
+        channel,
+        updated_at: new Date().toISOString(),
+      },
       { onConflict: "contact_id" }
     )
     .then(() => {}, () => {});
+
   return NextResponse.json({
     assigned: true,
     contact_id: contactId,
