@@ -15,7 +15,7 @@ function headers() {
 
 /** Returns the contact's current assigned GHL user id (empty string if unassigned). */
 export async function getContactAssignedTo(contactId: string): Promise<string> {
-  const res = await fetch(`${BASE}/contacts/${contactId}`, { headers: headers() });
+  const res = await fetch(`${BASE}/contacts/${contactId}`, { headers: headers(), cache: "no-store" });
   if (!res.ok) throw new Error(`GHL get contact failed ${res.status}: ${await res.text()}`);
   const body = await res.json();
   return body.contact?.assignedTo || "";
@@ -27,6 +27,7 @@ export async function assignContact(contactId: string, ghlUserId: string): Promi
     method: "PUT",
     headers: headers(),
     body: JSON.stringify({ assignedTo: ghlUserId }),
+    cache: "no-store",
   });
   if (!res.ok) throw new Error(`GHL assign failed ${res.status}: ${await res.text()}`);
 }
@@ -36,7 +37,7 @@ export interface ConvState {
   lastDirection: string | null; // 'inbound' (client) | 'outbound' (dispatcher)
   lastDate: number | null; // epoch ms
   lastBody: string | null; // text of the last message
-  unreadCount: number; // unread messages (0 = dispatcher has read it)
+  unreadCount: number | null; // null = no conversation exists; 0 = dispatcher read it; >0 = unread messages
 }
 
 /** Latest conversation state for a contact (to detect if the dispatcher replied). */
@@ -44,12 +45,14 @@ export async function getContactConversation(contactId: string): Promise<ConvSta
   const loc = process.env.GHL_LOCATION_ID;
   const res = await fetch(
     `${BASE}/conversations/search?locationId=${loc}&contactId=${contactId}`,
-    { headers: { ...headers(), Version: "2021-04-15" } }
+    { headers: { ...headers(), Version: "2021-04-15" }, cache: "no-store" }
   );
   if (!res.ok) throw new Error(`GHL conv search ${res.status}: ${await res.text()}`);
   const body = await res.json();
   const c = (body.conversations ?? [])[0];
-  if (!c) return { conversationId: null, lastDirection: null, lastDate: null, lastBody: null, unreadCount: 0 };
+  // Return null unreadCount when no conversation exists — distinguishes "never messaged"
+  // from "dispatcher read it (0)" so the reassign cron doesn't treat them identically.
+  if (!c) return { conversationId: null, lastDirection: null, lastDate: null, lastBody: null, unreadCount: null };
   return { conversationId: c.id ?? null, lastDirection: c.lastMessageDirection ?? null, lastDate: c.lastMessageDate ?? null, lastBody: c.lastMessageBody ?? null, unreadCount: c.unreadCount ?? 0 };
 }
 
@@ -59,6 +62,7 @@ export async function addContactTags(contactId: string, tags: string[]): Promise
     method: "POST",
     headers: headers(),
     body: JSON.stringify({ tags }),
+    cache: "no-store",
   });
   if (!res.ok) throw new Error(`GHL add tags failed ${res.status}: ${await res.text()}`);
 }

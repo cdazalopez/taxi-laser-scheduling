@@ -20,9 +20,10 @@ async function handle(req: NextRequest) {
 
   const sb = getServiceClient();
 
-  // Refresh pool only near the hour boundary (minutes 0-2) to avoid churn.
+  // Refresh pool every 10 minutes so dispatchers who come online or go offline
+  // are reflected within 10 minutes instead of waiting up to 57 minutes.
   const curMin = new Date().getUTCMinutes();
-  if (curMin <= 2) await sb.rpc("refresh_pool_activo").then(() => {}, () => {});
+  if (curMin % 10 === 0) await sb.rpc("refresh_pool_activo").then(() => {}, () => {});
 
   const { data: cfg } = await sb.from("reassign_config").select("*").eq("id", true).single();
   if (cfg && cfg.enabled === false) {
@@ -90,15 +91,24 @@ async function handle(req: NextRequest) {
     const idleFrom = Math.max(new Date(a.updated_at ?? a.assigned_at).getTime(), conv.lastDate ?? 0);
     if (Date.now() - idleFrom < IDLE_MS) continue;
 
-    // Dispatcher read the conversation — reset the idle clock instead of closing.
-    // If they don't reply within another IDLE_MS window it will be reassigned normally.
+    // Dispatcher read the conversation — reset the idle clock ONLY if they are still
+    // active in the pool. If they've gone offline, fall through to reassign immediately
+    // instead of locking this conversation to an offline dispatcher indefinitely.
     if (REQUIRE_UNREAD && conv.unreadCount === 0) {
-      await sb.from("active_assignments")
-        .update({ updated_at: new Date().toISOString() })
-        .eq("contact_id", a.contact_id)
-        .then(() => {}, () => {});
-      engaged++;
-      continue;
+      const { data: pa } = await sb
+        .from("pool_activo")
+        .select("is_active")
+        .eq("dispatcher_id", a.dispatcher_id)
+        .maybeSingle();
+      if (pa?.is_active) {
+        await sb.from("active_assignments")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("contact_id", a.contact_id)
+          .then(() => {}, () => {});
+        engaged++;
+        continue;
+      }
+      // Dispatcher is offline — fall through to reassignment below
     }
 
     if (a.reassign_count >= MAX_REASSIGNS) {

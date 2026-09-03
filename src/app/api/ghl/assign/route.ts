@@ -101,9 +101,9 @@ export async function POST(req: NextRequest) {
         () => {}
       );
 
-  // Refresh the live pool only at the top of each hour (minutes 0-2) to avoid burning
-  // GHL quota and Supabase RPC calls on every single inbound message.
-  if (new Date().getMinutes() <= 2) {
+  // Refresh the live pool every 10 minutes so dispatcher schedule changes take effect
+  // within 10 minutes instead of waiting up to 57 minutes.
+  if (new Date().getUTCMinutes() % 10 === 0) {
     await sb.rpc("refresh_pool_activo").then(() => {}, () => {});
   }
 
