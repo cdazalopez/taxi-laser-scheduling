@@ -155,8 +155,9 @@ export async function POST(req: NextRequest) {
       // owner exists but is inactive right now (or unmapped) → reassign to an active dispatcher
       reassignedFrom = owner?.id ?? null;
     }
-  } catch {
+  } catch (e: any) {
     // GHL lookup failed → proceed to assign as a safe default
+    console.warn(`[ghl/assign] getContactAssignedTo failed for ${contactId}:`, e?.message ?? e);
   }
 
   const { data, error } = await sb.rpc("assign_next_dispatcher");

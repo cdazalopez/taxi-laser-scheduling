@@ -52,12 +52,34 @@ async function handle(req: NextRequest) {
   let reassigned = 0, resolved = 0, closed = 0, checked = 0, engaged = 0;
   for (const a of open ?? []) {
     checked++;
-    let conv;
+
+    // Auto-cleanup: conversations at the ceiling can't be reassigned — tag and remove
+    // BEFORE making any GHL call so we don't waste quota on dead conversations.
+    // (If the dispatcher already replied, it resolves as "outbound" in the next tick.)
+    if (a.reassign_count >= MAX_REASSIGNS) {
+      await addContactTags(a.contact_id, ["sin_respuesta"]).catch(() => {});
+      await sb.from("active_assignments").delete().eq("contact_id", a.contact_id);
+      continue;
+    }
+
+    // Fetch conversation state. On 429, retry once after 1.5s. If still throttled,
+    // abort the entire tick — hammering a rate-limited API makes the problem worse.
+    let conv: Awaited<ReturnType<typeof getContactConversation>> | undefined;
     try {
       conv = await getContactConversation(a.contact_id);
-    } catch {
-      continue; // GHL hiccup — try next tick
+    } catch (e: any) {
+      if (!String(e?.message).includes("429")) { continue; } // non-429 hiccup — skip
+      await new Promise(r => setTimeout(r, 1500));
+      try {
+        conv = await getContactConversation(a.contact_id);
+      } catch (e2: any) {
+        if (String(e2?.message).includes("429")) {
+          return NextResponse.json({ ok: true, checked, reassigned, resolved, closed, engaged, aborted: "ghl_429" });
+        }
+        continue;
+      }
     }
+    if (!conv) continue;
 
     // Store conversation_id on first fetch so future ticks use the right conversation.
     if (conv.conversationId && !a.conversation_id) {
@@ -109,12 +131,6 @@ async function handle(req: NextRequest) {
         continue;
       }
       // Dispatcher is offline — fall through to reassignment below
-    }
-
-    if (a.reassign_count >= MAX_REASSIGNS) {
-      await addContactTags(a.contact_id, ["sin_respuesta"]).catch(() => {});
-      await sb.from("active_assignments").delete().eq("contact_id", a.contact_id);
-      continue;
     }
 
     const { data } = await sb.rpc("assign_next_dispatcher");
