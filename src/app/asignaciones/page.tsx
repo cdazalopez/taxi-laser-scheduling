@@ -47,8 +47,8 @@ function timeAgo(iso: string): string {
 }
 
 export default async function AsignacionesPage() {
-  // DISABLED — remove this line to re-enable the live view
-  redirect("/");
+  // DISABLED — set LIVE_VIEW_ENABLED=true in Vercel env vars to re-enable
+  if (!process.env.LIVE_VIEW_ENABLED) redirect("/");
 
   let rows, coverage, reassigns;
   try {
