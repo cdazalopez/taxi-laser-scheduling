@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getRecentAssignments, getCoverageStats, getRecentReassignments, RETURNING_REASON } from "@/lib/queries";
 import { dispatcherNumber } from "@/lib/dates";
@@ -46,6 +47,9 @@ function timeAgo(iso: string): string {
 }
 
 export default async function AsignacionesPage() {
+  // DISABLED — remove this line to re-enable the live view
+  redirect("/");
+
   let rows, coverage, reassigns;
   try {
     [rows, coverage, reassigns] = await Promise.all([
@@ -66,7 +70,7 @@ export default async function AsignacionesPage() {
         </div>
         <div className="flex items-center gap-2">
           <ClearLiveButton />
-          <AutoRefresh intervalMs={5000} />
+          {/* <AutoRefresh intervalMs={5000} /> */}{/* DISABLED */}
         </div>
       </div>
 

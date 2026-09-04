@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 const nav = [
   { href: "/", label: "Schedule" },
-  { href: "/asignaciones", label: "En vivo" },
+  // { href: "/asignaciones", label: "En vivo" }, // DISABLED — uncomment to re-enable
   { href: "/insights", label: "Insights" },
   { href: "/generar", label: "Generar" },
   { href: "/perfiles", label: "Perfiles" },
