@@ -145,6 +145,7 @@ export async function POST(req: NextRequest) {
               { onConflict: "contact_id" }
             )
             .then(() => {}, () => {});
+          await log("owner_active", owner.id, null);
           return NextResponse.json(
             { assigned: false, reason: "owner_active", ghl_user_id: currentGhl },
             { status: 200 }
@@ -160,7 +161,15 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await sb.rpc("assign_next_dispatcher");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  const row = Array.isArray(data) ? data[0] : data;
+  let row = Array.isArray(data) ? data[0] : data;
+
+  // Retry once after 100ms — concurrent SKIP LOCKED can transiently exhaust a small pool.
+  if (!row) {
+    await new Promise((r) => setTimeout(r, 100));
+    const { data: data2, error: err2 } = await sb.rpc("assign_next_dispatcher");
+    if (err2) return NextResponse.json({ error: err2.message }, { status: 500 });
+    row = Array.isArray(data2) ? data2[0] : data2;
+  }
 
   // No active dispatcher (or chosen one has no GHL mapping) → flag and stop.
   if (!row || !row.ghl_user_id) {
